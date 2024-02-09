@@ -1,0 +1,7 @@
+Debug*.log
+.idea
+__pycache__
+logs
+*.keras
+*.png
+*.h5
