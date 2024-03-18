@@ -6,7 +6,6 @@ import dicomsdl  # or from dicomsdl import some_function
 from datetime import datetime
 import cv2
 import numpy as np
-import dicom
 
 from tensorflow.keras.applications.vgg16 import preprocess_input
 
@@ -128,28 +127,29 @@ class BreastCancerDataset(Sequence):
 
         return slices
 
-    def get_pixels_hu(self, slices):
-        image = np.stack([s.pixel_array for s in slices])
-        # Convert to int16 (from sometimes int16),
-        # should be possible as values should always be low enough (<32k)
-        image = image.astype(np.int16)
+    def get_pixels_hu(self, slice, image):
+        try:
+            # Convert to int16 (from sometimes int16),
+            # should be possible as values should always be low enough (<32k)
+            image = image.astype(np.int16)
 
-        # Set outside-of-scan pixels to 0
-        # The intercept is usually -1024, so air is approximately 0
-        image[image == -2000] = 0
+            # Set outside-of-scan pixels to 0
+            # The intercept is usually -1024, so air is approximately 0
+            image[image == -2000] = 0
 
-        # Convert to Hounsfield units (HU)
-        for slice_number in range(len(slices)):
+            # Convert to Hounsfield units (HU)
+            intercept = slice.RescaleIntercept
+            slope = slice.RescaleSlope
 
-            intercept = slices[slice_number].RescaleIntercept
-            slope = slices[slice_number].RescaleSlope
+            if slope is not None and slope != 1:
+                image = slope * image.astype(np.float64)
+                image = image.astype(np.int16)
 
-            if slope != 1:
-                image[slice_number] = slope * image[slice_number].astype(np.float64)
-                image[slice_number] = image[slice_number].astype(np.int16)
+                image += np.int16(intercept)
 
-            image[slice_number] += np.int16(intercept)
-
+        except Exception as e:
+            print(f"Intercept: {intercept}, Slope: {slope}")
+            print(f"get_pixels_hu {image}: {e}")
         return np.array(image, dtype=np.int16)
 
     def resample(self, image, scan, new_spacing=[1, 1, 1]):
@@ -166,24 +166,82 @@ class BreastCancerDataset(Sequence):
 
         return image, new_spacing
 
+    def resize_with_letterbox(self, image, target_size):
+        resized_image = image
+        # Get the original image size
+        try:
+            original_height, original_width = image.shape[:2]
+            largest_roi_dim = max(image.shape[:2])
+
+            # Step 2: Create an empty square box
+            empty_box = np.zeros((largest_roi_dim, largest_roi_dim, 3), dtype=np.uint8)
+
+            # Step 3: Place extracted ROI on the box
+            # Calculate position to place ROI in the center of the empty box
+            x_offset = (largest_roi_dim - image.shape[1]) // 2
+            y_offset = (largest_roi_dim - image.shape[0]) // 2
+            empty_box[y_offset:y_offset + image.shape[0], x_offset:x_offset + image.shape[1]] = image
+
+            # Step 4: Resize the composite image
+            #print(empty_box.shape)
+
+            resized_image = cv2.resize(empty_box, (target_size[0], target_size[1]))
+        except Exception as e:
+            print(f"Here Error loading DICOM file {image}: {e}")
+        return resized_image
+
     def load_and_preprocess_image(self, file_path):
 
         def normalize_image(image):
             min_val = np.min(image)
             max_val = np.max(image)
             image = (image - min_val) / (max_val - min_val)
-
             return image
 
         try:
-            image = dicomsdl.open(file_path).pixelData()
+            slice = dicomsdl.open(file_path)
+
+            image = slice.pixelData()
+            #binary_image = cv2.convertScaleAbs(image)
+
+            #resized_image = cv2.resize(image, (800, 600))
+
+            # Create a named window and set its size
+            #cv2.namedWindow("MyImageWindow", cv2.WINDOW_NORMAL)
+            #cv2.resizeWindow("MyImageWindow", 800, 600)
+
+            # Display the resized image in the specified window
+            #cv2.imshow(image, cmap='gray')
+            #cv2.waitKey(0)
+            #cv2.destroyAllWindows()
+
+            #_, binary_image = cv2.threshold(binary_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            #contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            #for contour in contours:
+            #    x, y, w, h = cv2.boundingRect(contour)
+            #    if w > 100 and h > 100 and h > y and w > x:
+            #        if 0 <= y < y + h <= image.shape[0] and 0 <= x < x + w <= image.shape[1]:
+            #            image = image[y - y:h - y, x - x:w - x]
+            #            cv2.imshow("DICOM Image", image)
+            #            cv2.waitKey(0)
+            #            cv2.destroyAllWindows()
+            #            break
+
             image = cv2.resize(image, (self.image_size[1], self.image_size[0]))
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+            #image = self.get_pixels_hu(slice, image)
+            #self.show_image(image)
+
+
+            #image = slice.pixelData()
+            #image = self.resize_with_letterbox(image, (self.image_size[1], self.image_size[0]))
+            #image = cv2.resize(image, (self.image_size[1], self.image_size[0]))
             #dicom_data.pixel_array.astype(np.uint8)
             #image = np.expand_dims(image, axis=-1)
 
 
 
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
             #self.show_image(image)
 
 

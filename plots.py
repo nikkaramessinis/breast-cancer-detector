@@ -1,5 +1,4 @@
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 def draw_plots(df_train):
     # Plot 1: Catplot

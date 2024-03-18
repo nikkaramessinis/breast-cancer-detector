@@ -1,6 +1,7 @@
 import logging
 import sys, io
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_auc_score, roc_curve
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 def collect_metrics(y_pred, y_true):
@@ -29,11 +30,19 @@ def collect_metrics(y_pred, y_true):
 
     # Calculate AUC
     auc = roc_auc_score(y_true, y_pred)
+
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
     logging.debug("Confusion Matrix:")
     logging.debug(cm)
     logging.debug(f"Accuracy: {accuracy}")
     logging.debug(f"Sensitivity: {sensitivity}")
     logging.debug(f"Specificity: {specificity}")
+    logging.debug(f"Precision: {precision}")
+    logging.debug(f"Recall: {recall}")
+    logging.debug(f"F1: {f1}")
+
     logging.debug(f"AUC: {auc}")
 
 

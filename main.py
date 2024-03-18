@@ -199,6 +199,10 @@ def main():
     model = Sequential([
         base_model,
         Conv2D(256, (3, 3), activation='relu', strides=(1, 1), padding='same'),
+        BatchNormalization(),
+        MaxPooling2D((3, 3)),
+        Conv2D(128, (3, 3), activation='relu', strides=(1, 1), padding='same'),
+        BatchNormalization(),
         MaxPooling2D((3, 3)),
         Flatten(),
         BatchNormalization(),
@@ -220,7 +224,7 @@ def main():
     tensorboard_callback = TensorBoard(log_dir="logs")
 
     #hist = model.fit(train_data_loader, validation_data=val_data_loader, epochs=100, callbacks=[early_stopper, clr, custom_callback, checkpoint_callback, tensorboard_callback])
-    hist = model.fit(train_data_loader, validation_data=val_data_loader, epochs=50, callbacks=[early_stopper, checkpoint_callback, tensorboard_callback])
+    hist = model.fit(train_data_loader, validation_data=val_data_loader, epochs=50, callbacks=[early_stopper, tensorboard_callback])
     model.save(f'{log_filename}.keras')
 
     fig, axes = plt.subplots(ncols=2, figsize=(22, 7))
