@@ -6,3 +6,4 @@ Contains:
 - requirements.txt
 - python files
 - best run log
+- jupyter notebook for graphs and data understanding
