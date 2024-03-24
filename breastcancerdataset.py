@@ -1,12 +1,10 @@
 from tensorflow.keras.utils import Sequence
-import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 import dicomsdl  # or from dicomsdl import some_function
 from datetime import datetime
 import cv2
 import numpy as np
-
 from tensorflow.keras.applications.vgg16 import preprocess_input
 
 class BreastCancerDataset(Sequence):
@@ -41,13 +39,11 @@ class BreastCancerDataset(Sequence):
         else:
             return image
 
-
     def flip_breast_side(self, img):
         img_breast_side = self._determine_breast_side(img)
         if img_breast_side == self.breast_side:
             return img
         else:
-            #print("Flipping")
             return np.fliplr(img)
 
     # Determine the current breast side
@@ -56,10 +52,8 @@ class BreastCancerDataset(Sequence):
         left_col_sum = np.sum(col_sums_split[0])
         right_col_sum = np.sum(col_sums_split[1])
         if left_col_sum > right_col_sum:
-            #print("L")
             return 'L'
         else:
-            #print("R")
             return 'R'
 
 
@@ -73,7 +67,6 @@ class BreastCancerDataset(Sequence):
         image = self.flip_colouring(image)
         # Convert RGB image to LAB color space
         lab_image = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
-
 
         # Apply CLAHE to each channel of the LAB image
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
@@ -101,8 +94,6 @@ class BreastCancerDataset(Sequence):
         with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
             results = list(
                 executor.map(self.load_and_preprocess_image, [self.df.iloc[idx]['file_path'] for idx in batch_indices]))
-
-        #results = list(map(self.load_and_preprocess_image, [self.df.iloc[idx]['file_path'] for idx in batch_indices]))
 
         X = np.array([result[0] for result in results])
         y = np.array([result[1] for result in results])
@@ -182,9 +173,6 @@ class BreastCancerDataset(Sequence):
             y_offset = (largest_roi_dim - image.shape[0]) // 2
             empty_box[y_offset:y_offset + image.shape[0], x_offset:x_offset + image.shape[1]] = image
 
-            # Step 4: Resize the composite image
-            #print(empty_box.shape)
-
             resized_image = cv2.resize(empty_box, (target_size[0], target_size[1]))
         except Exception as e:
             print(f"Here Error loading DICOM file {image}: {e}")
@@ -202,57 +190,9 @@ class BreastCancerDataset(Sequence):
             slice = dicomsdl.open(file_path)
 
             image = slice.pixelData()
-            #binary_image = cv2.convertScaleAbs(image)
-
-            #resized_image = cv2.resize(image, (800, 600))
-
-            # Create a named window and set its size
-            #cv2.namedWindow("MyImageWindow", cv2.WINDOW_NORMAL)
-            #cv2.resizeWindow("MyImageWindow", 800, 600)
-
-            # Display the resized image in the specified window
-            #cv2.imshow(image, cmap='gray')
-            #cv2.waitKey(0)
-            #cv2.destroyAllWindows()
-
-            #_, binary_image = cv2.threshold(binary_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            #contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            #for contour in contours:
-            #    x, y, w, h = cv2.boundingRect(contour)
-            #    if w > 100 and h > 100 and h > y and w > x:
-            #        if 0 <= y < y + h <= image.shape[0] and 0 <= x < x + w <= image.shape[1]:
-            #            image = image[y - y:h - y, x - x:w - x]
-            #            cv2.imshow("DICOM Image", image)
-            #            cv2.waitKey(0)
-            #            cv2.destroyAllWindows()
-            #            break
-
             image = cv2.resize(image, (self.image_size[1], self.image_size[0]))
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-            #image = self.get_pixels_hu(slice, image)
-            #self.show_image(image)
-
-
-            #image = slice.pixelData()
-            #image = self.resize_with_letterbox(image, (self.image_size[1], self.image_size[0]))
-            #image = cv2.resize(image, (self.image_size[1], self.image_size[0]))
-            #dicom_data.pixel_array.astype(np.uint8)
-            #image = np.expand_dims(image, axis=-1)
-
-
-
-            #self.show_image(image)
-
-
             image = self.enhance_contrast(image)
-            #cv2.imshow('image', image)
-            #c = cv2.waitKey()
-            #image = normalize_image(image) #for one channel
-            #image = np.repeat(image, 3, axis=-1)
-
-            #if self.datagen:
-            #    image = self.datagen.random_transform(image)
             label = self.df[self.df['file_path'] == file_path]['cancer'].values[0]
             return image, label
         except Exception as e:

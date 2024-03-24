@@ -5,8 +5,6 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 def collect_metrics(y_pred, y_true):
-    #logging.debug(f"y_pred {y_pred}")
-    #logging.debug(f"y_true {y_true}")
     accuracy = accuracy_score(y_true, y_pred)
 
     # Print classification report

@@ -40,8 +40,6 @@ from keras.layers import Conv2D, MaxPooling2D
 from focalloss import FocalLoss
 
 
-
-
 def configure_logging(log_filename):
 
     logging.basicConfig(
@@ -77,24 +75,12 @@ def main():
     DF_train = df[df['biopsy'] == 1].reset_index(drop = True)
     DF_train.head()
 
-    # The number of positive (malignant) and negative (not-malignat) cases should be the same
-    # to create a balanced dataset.
-    #undersampled_majority = DF_train[DF_train['cancer'] == 1].sample(500, random_state=42)
-    #undersampled_minority = DF_train[DF_train['cancer'] == 0].sample(500, random_state=42)
-    #DF_train = pd.concat([undersampled_majority, undersampled_minority])
-
-    # we had this before
-    #DF_train = DF_train.groupby(['cancer']).apply(lambda x: x.sample(500, replace = True)
-    #                                                      ).reset_index(drop = True)
-
     draw_plots(DF_train)
 
     print('New Data Size:', DF_train.shape[0])
 
-
-    # the number of not-malignant cancer cases from biopsy
+    # The number of not-malignant cancer cases from biopsy
     logging.debug(f"the number of not-malignant cancer cases from biopsy {len(DF_train[(DF_train['biopsy'] == 1) & (DF_train['cancer'] == 0)])}")
-
     # the number of malignant cancer cases from biopsy
     logging.debug(f"the number of malignant cancer cases from biopsy {len(DF_train[(DF_train['biopsy'] == 1) & (DF_train['cancer'] == 1)])}")
 
@@ -107,31 +93,22 @@ def main():
         height_shift_range=0.1,
         horizontal_flip=True,
         vertical_flip=True,
-        fill_mode='reflect'
-    )
+        fill_mode='reflect')
 
     # Split the data
     train_images_df, val_images_df = train_test_split(images_, test_size=0.2)
 
-    logging.debug(f"train_images_df  {train_images_df.head()}")
-    logging.debug(f"train_images_df columns  {train_images_df.columns}")
-    logging.debug(f"train_images_df  shape {train_images_df.shape}")
-
-    logging.debug(f"val_images_df  {val_images_df.head()}")
-    logging.debug(f"val_images_df columns  {val_images_df.columns}")
-    logging.debug(f"val_images_df  shape {val_images_df.shape}")
     # Define batch size and target size
-
     batch_size = 32
     image_size = (512, 512)
-    STEPS_PER_EPOCHS = train_images_df.shape[0] / batch_size
-    logging.debug(f"batch_size {batch_size}")
-    logging.debug("Number of Training Samples : {}".format(train_images_df.shape[0]))
-    logging.debug("Number of Validation Samples : {}".format(val_images_df.shape[0]))
+    steps_per_epochs = train_images_df.shape[0] / batch_size
+    logging.debug(f"Batch_size: {batch_size}")
+    logging.debug("Number of Training Samples: {}".format(train_images_df.shape[0]))
+    logging.debug("Number of Validation Samples: {}".format(val_images_df.shape[0]))
     logging.debug(f"Number of Samples in one Batch: {batch_size}")
-    logging.debug(f'STEPS PER EPOCHS: {STEPS_PER_EPOCHS}')
+    logging.debug(f'Steps per epochs: {steps_per_epochs}')
 
-    # Create data generators using tf.data
+    # Create data generators
     train_dataset = BreastCancerDataset(train_images_df, batch_size, image_size, datagen=datagen)
     val_dataset = BreastCancerDataset(val_images_df, batch_size, image_size)
 
@@ -141,7 +118,6 @@ def main():
             tf.TensorSpec(shape=(None, *image_size, 3), dtype=tf.float32),
             tf.TensorSpec(shape=(None, 1), dtype=tf.int32)
         )).cache().prefetch(tf.data.AUTOTUNE)
-
 
     val_data_loader = tf.data.Dataset.from_generator(
         lambda: val_dataset,
@@ -166,14 +142,10 @@ def main():
     y_numpy = merged_y.numpy()
 
     logging.debug(X_numpy.shape)
-
-    #custom_callback = CustomCallback(target_accuracy=0.85)
-
     early_stopper = EarlyStopping(monitor='val_accuracy',
                                   min_delta=0.01,
                                   patience=3,
-                                  restore_best_weights=True
-                                  )
+                                  restore_best_weights=True)
 
     # Set up ModelCheckpoint callback
     checkpoint_callback = ModelCheckpoint(
@@ -182,16 +154,16 @@ def main():
         save_best_only=True,  # Save only the best models based on the monitored metric
         save_weights_only=True,  # Save only the model weights, not the entire model
         mode="auto",  # Mode can be "min", "max", or "auto" (determines the best checkpoint)
-        verbose=1  # Set to 1 to see checkpoint saving information in the console
-    )
+        verbose=1)  # Set to 1 to see checkpoint saving information in the console
 
     clr = CyclicLR(base_lr=1e-4, max_lr=1e-2, step_size=8, mode='triangular')
 
     num_classes = 1
     input_shape = (image_size[0], image_size[1], 3)
-    my_dense_activation = 'sigmoid'# try others as well softmax
-    logging.debug(f"input_shape {input_shape} my_dense_activation {my_dense_activation}")
+    my_dense_activation = 'sigmoid'
+    logging.debug(f"input_shape: {input_shape} my_dense_activation: {my_dense_activation}")
     base_model = VGG16(weights='imagenet', include_top=False, input_shape=input_shape)
+
     # Freeze the layers of the pre-trained model
     base_model.trainable = False
 
@@ -214,16 +186,14 @@ def main():
     alpha = 1  # balancing parameter, adjust as needed
     gamma = 2  # focusing parameter, adjust as needed
     focal_loss_criterion = FocalLoss(alpha=alpha, gamma=gamma)
+    logging.debug("Focal_loss as a model.compile loss")
 
-    logging.debug("focal_loss as a model.compile loss")
     # Compile the model
     model.compile(optimizer=optimizers.Adam(learning_rate=0.001),loss=focal_loss_criterion,
-                  #loss='binary_crossentropy',
                   metrics=['accuracy'])
 
     tensorboard_callback = TensorBoard(log_dir="logs")
 
-    #hist = model.fit(train_data_loader, validation_data=val_data_loader, epochs=100, callbacks=[early_stopper, clr, custom_callback, checkpoint_callback, tensorboard_callback])
     hist = model.fit(train_data_loader, validation_data=val_data_loader, epochs=50, callbacks=[early_stopper, tensorboard_callback])
     model.save(f'{log_filename}.keras')
 
@@ -251,9 +221,6 @@ def main():
     collect_metrics(y_pred, y_true)
 
 
-
-
-
 def prediction_phase():
     # Predict on the test data
     y_pred_prob = model.predict(X_test)
@@ -277,5 +244,4 @@ def prediction_phase():
 
 
 if __name__ == '__main__':
-    #multiprocessing.freeze_support()
     main()
